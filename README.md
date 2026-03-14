@@ -1,6 +1,6 @@
 # skeleton
 
-Minimal server-rendered TSX app. Hono + hono/jsx for SSR, Tailwind v4, htmx, SQLite via better-sqlite3, dbmate migrations, TypeSQL for typed queries. No React, no client bundle, no user accounts.
+Minimal server-rendered TSX app. Hono + hono/jsx for SSR, Tailwind v4, htmx, SQLite via better-sqlite3, dbmate migrations, hand-written typed query wrappers. No React, no client bundle, no user accounts.
 
 ## Philosophy
 
@@ -12,7 +12,7 @@ This stack is designed to be **simple, stable, and maintainable over a long time
 
 **Familiar syntax, not a framework monoculture.** JSX/TSX is understood by nearly every JavaScript developer and most AI coding agents today. Using hono/jsx means getting that familiar syntax for free — no React runtime, no virtual DOM, no hydration — just functions that return HTML strings. Any developer who has written a React component can read and write these components immediately.
 
-**Raw SQL over abstractions.** SQL has been stable for decades. ORMs and query builders come and go. Writing queries in `.sql` files and using TypeSQL to generate typed wrappers gives the best of both worlds: readable SQL that any developer can understand, with TypeScript types at the call site. If TypeSQL ever goes unmaintained, the generated files continue to work indefinitely.
+**Raw SQL over abstractions.** SQL has been stable for decades. ORMs and query builders come and go. Raw SQL strings in `src/db/sql.ts` with hand-written typed wrapper functions in `src/db/queries.ts` gives readable SQL that any developer can understand, with TypeScript types at the call site — no code-generation step, no extra tooling.
 
 **Build tooling is a dev concern, not a runtime concern.** Vite handles HMR for server code in development. Tailwind runs as a standalone CLI, independent of Vite, outputting a static CSS file to `public/`. The production output is a plain Node.js file with no Vite or Tailwind dependency at runtime. The build toolchain can be upgraded or replaced without touching any application code.
 
@@ -27,14 +27,14 @@ This stack is designed to be **simple, stable, and maintainable over a long time
 | Interactivity | htmx (vendored in `public/`) |
 | Database | SQLite via better-sqlite3 |
 | Migrations | dbmate |
-| Typed queries | TypeSQL |
+| Typed queries | Hand-written wrappers over better-sqlite3 |
 | Auth | Session cookie, admin-only via env vars |
 
 ## Setup
 
 ```bash
 npm install
-cp .env .env.local   # then edit credentials
+cp .env.example .env   # then edit credentials
 ```
 
 **.env vars:**
@@ -53,7 +53,6 @@ The admin account is not stored in the database — credentials come entirely fr
 
 ```bash
 npm run dev          # starts Vite + Tailwind watcher concurrently
-npm run types:watch  # TypeSQL watcher — run separately, only after db:migrate
 ```
 
 Open http://localhost:5173 (Vite default) or whatever port Vite prints.
@@ -84,27 +83,37 @@ SELECT * FROM some_table;
 .quit
 ```
 
-## Typed SQL queries (TypeSQL)
+## Typed SQL queries
 
 1. Write a migration, run `npm run db:migrate`
-2. Add a `.sql` file to `src/sql/` with a `-- @name` annotation:
-
-```sql
--- @name ListPosts
-SELECT id, title, created_at FROM posts ORDER BY created_at DESC;
-```
-
-3. Run `npm run types:watch` (or `npx typesql compile` once)
-4. TypeSQL emits a typed module to `src/db/queries/` — import and call it:
+2. Add SQL strings to `src/db/sql.ts`:
 
 ```ts
-import { listPosts } from '@/db/queries/list-posts'
-import { db } from '@/db/client'
-
-const posts = listPosts(db)  // fully typed result
+export const LIST_POSTS = `
+  SELECT id, title, created_at FROM posts ORDER BY created_at DESC
+`
 ```
 
-`src/db/queries/` is generated — do not edit by hand.
+3. Add a typed wrapper function to `src/db/queries.ts`:
+
+```ts
+import { db } from './client'
+import { LIST_POSTS } from './sql'
+
+export type Post = { id: number; title: string; created_at: number }
+
+export function listPosts(): Post[] {
+  return db.prepare(LIST_POSTS).all() as Post[]
+}
+```
+
+4. Import and call it in a route:
+
+```ts
+import { listPosts } from '../db/queries'
+
+const posts = listPosts()
+```
 
 ## Auth
 
@@ -162,7 +171,7 @@ Or write a systemd unit pointing to `node /path/to/dist/index.js`.
 
 ```bash
 npm run db:migrate  # run pending migrations against production DB
-npm run build       # typesql compile + tailwind build + vite build → dist/index.js + public/style.css
+npm run build       # tailwind build + vite build → dist/index.js + public/style.css
 npm start           # node dist/index.js
 ```
 
@@ -185,11 +194,10 @@ src/
       login.tsx      # GET+POST /admin/login
   db/
     client.ts        # better-sqlite3 singleton
-    queries/         # TypeSQL-generated (do not edit)
-  sql/               # hand-written .sql query files (TypeSQL input)
+    sql.ts           # raw SQL string constants
+    queries.ts       # typed wrapper functions (edit here to add queries)
   components/        # shared TSX components
 public/              # static assets
-typesql.json
 vite.config.ts
 tsconfig.json
 .env

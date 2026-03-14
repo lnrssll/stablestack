@@ -5,12 +5,11 @@
     "dev": "concurrently -n server,css -c blue,cyan \"vite\" \"tailwindcss -i ./src/style.css -o ./public/style.css --watch\"",
     "css:watch": "tailwindcss -i ./src/style.css -o ./public/style.css --watch",
     "css:build": "tailwindcss -i ./src/style.css -o ./public/style.css --minify",
-    "build": "typesql compile && npm run css:build && vite build",
+    "build": "npm run css:build && vite build",
     "start": "node dist/index.js",
     "db:migrate": "dbmate up",
     "db:rollback": "dbmate rollback",
-    "db:new": "dbmate new",
-    "types:watch": "typesql compile --watch"
+    "db:new": "dbmate new"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
@@ -28,7 +27,6 @@
     "tailwindcss": "^4.2.1",
     "tsx": "^4.7.1",
     "typescript": "^5.8.3",
-    "typesql-cli": "^0.22.0",
     "vite": "^7.0.0"
   }
 }
