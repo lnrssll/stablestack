@@ -1,0 +1,34 @@
+{
+  "name": "skeleton",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n server,css -c blue,cyan \"vite\" \"tailwindcss -i ./src/style.css -o ./public/style.css --watch\"",
+    "css:watch": "tailwindcss -i ./src/style.css -o ./public/style.css --watch",
+    "css:build": "tailwindcss -i ./src/style.css -o ./public/style.css --minify",
+    "build": "typesql compile && npm run css:build && vite build",
+    "start": "node dist/index.js",
+    "db:migrate": "dbmate up",
+    "db:rollback": "dbmate rollback",
+    "db:new": "dbmate new",
+    "types:watch": "typesql compile --watch"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@hono/vite-build": "^1.10.0",
+    "@hono/vite-dev-server": "^0.25.1",
+    "@tailwindcss/cli": "^4.2.1",
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.3.1",
+    "hono": "^4.12.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.11.17",
+    "concurrently": "^9.2.1",
+    "tailwindcss": "^4.2.1",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3",
+    "typesql-cli": "^0.22.0",
+    "vite": "^7.0.0"
+  }
+}

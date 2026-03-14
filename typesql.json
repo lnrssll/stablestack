@@ -1,0 +1,5 @@
+{
+  "databaseUri": "sqlite:./db/app.db",
+  "sqlDir": "./src/sql",
+  "client": "better-sqlite3"
+}
