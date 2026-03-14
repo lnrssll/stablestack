@@ -124,14 +124,22 @@ npm run db:migrate
 
 **Step 2 — write SQL queries:**
 
-Add `.sql` files to `src/sql/`. Each query needs a `-- @name` annotation:
+Add `.sql` files to `src/sql/`. Each file must contain exactly one query with a `-- @name` annotation:
+
+`src/sql/list-posts.sql`:
 ```sql
 -- @name ListPosts
 SELECT id, title, created_at FROM posts ORDER BY created_at DESC;
+```
 
+`src/sql/get-post.sql`:
+```sql
 -- @name GetPost
 SELECT id, title, body, created_at FROM posts WHERE id = :id;
+```
 
+`src/sql/insert-post.sql`:
+```sql
 -- @name InsertPost
 INSERT INTO posts (title, body) VALUES (:title, :body);
 ```
