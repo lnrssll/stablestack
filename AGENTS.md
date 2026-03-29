@@ -25,7 +25,7 @@ This codebase is built for **longevity and maintainability over convenience**. B
 
 **No client-side frameworks or state management.** The rendering model is server-rendered HTML + htmx for partial updates. Do not introduce React, Vue, Svelte, Zustand, or any client-side state. If a feature feels like it needs a client-side framework, that's usually a signal to redesign the feature, not to add the framework.
 
-**Keep SQL raw.** Queries live in `src/sql/` as plain `.sql` files. Do not introduce an ORM (Prisma, Drizzle, Kysely, etc.). The existing approach — raw SQL typed by TypeSQL — is intentional. SQL is more stable than any ORM's API, and `.sql` files are readable by anyone.
+**Keep SQL raw.** Queries live in `src/db/sql.ts` as named string constants. Do not introduce an ORM (Prisma, Drizzle, Kysely, etc.) or a query builder. Raw SQL is more stable than any abstraction's API, and string constants are readable by anyone.
 
 **Vite and Tailwind are dev/build tools only.** The production artifact (`dist/index.js`) has no dependency on either. Tailwind runs as a standalone CLI (`npm run css:watch` / `npm run css:build`) completely independently of Vite — do not re-couple them. Do not import anything from `vite` or `tailwindcss` in application code.
 
@@ -38,6 +38,7 @@ This codebase is built for **longevity and maintainability over convenience**. B
 - **No hooks.** `useState`, `useEffect`, `useRef`, etc. do not exist. Components are pure functions that return JSX strings.
 - **No client-side rendering.** Everything renders on the server to an HTML string. There is no virtual DOM, no reconciliation, no hydration.
 - **Use `class` not `className`.** Hono/jsx uses the HTML attribute name directly.
+- **Use lowercase `method="post"` on forms**, not `"POST"` — hono/jsx's type only accepts lowercase.
 - **The JSX factory is configured globally** via `jsxImportSource: "hono/jsx"` in `tsconfig.json`. No per-file pragma needed.
 - **Event handlers in JSX are fine for form submissions** (they become HTML attributes), but there is no JS runtime to back them up. Use htmx for dynamic behavior.
 
@@ -57,12 +58,25 @@ src/
       login.tsx      # login/logout
   db/
     client.ts        # better-sqlite3 singleton (exports `db`)
-    sql.ts           # raw SQL string constants
-    queries.ts       # typed wrapper functions
+    sql.ts           # raw SQL query strings as named constants
+    queries.ts       # typed wrapper functions over sql.ts
   components/        # shared TSX components
 db/
   migrations/        # dbmate migration files (<timestamp>_<name>.sql)
   schema.sql         # auto-maintained by dbmate — do not edit
+```
+
+## Imports
+
+**Always use relative imports.** The `@/` alias is defined in `tsconfig.json` for editor tooling but is not wired up in Vite and will cause runtime errors.
+
+```ts
+// correct
+import { db } from '../../db/client'
+import { listPosts } from '../../db/queries'
+
+// wrong — breaks at runtime
+import { db } from '@/db/client'
 ```
 
 ## Rendering patterns
@@ -122,42 +136,54 @@ Run it:
 npm run db:migrate
 ```
 
-**Step 2 — add SQL strings and typed wrapper functions:**
-
-Add the raw SQL to `src/db/sql.ts`:
+**Step 2 — add SQL constants to `src/db/sql.ts`:**
 ```ts
 export const LIST_POSTS = `
-  SELECT id, title, created_at FROM posts ORDER BY created_at DESC
+  SELECT id, title, created_at
+  FROM posts
+  ORDER BY created_at DESC
 `
+
+export const GET_POST = `
+  SELECT id, title, body, created_at FROM posts WHERE id = ?
+`
+
 export const INSERT_POST = `
   INSERT INTO posts (title, body) VALUES (?, ?)
 `
 ```
 
-Add typed wrapper functions to `src/db/queries.ts`:
+**Step 3 — add typed wrapper functions to `src/db/queries.ts`:**
 ```ts
-import { db } from './client'
-import { LIST_POSTS, INSERT_POST } from './sql'
+import * as sql from './sql'
 
-export type Post = { id: number; title: string; body: string; created_at: number }
+export type Post = {
+  id: number
+  title: string
+  body: string
+  created_at: number
+}
 
 export function listPosts(): Post[] {
-  return db.prepare(LIST_POSTS).all() as Post[]
+  return db.prepare(sql.LIST_POSTS).all() as Post[]
+}
+
+export function getPost(id: number): Post | undefined {
+  return db.prepare(sql.GET_POST).get(id) as Post | undefined
 }
 
 export function insertPost(title: string, body: string): number {
-  return Number(db.prepare(INSERT_POST).run(title, body).lastInsertRowid)
+  const result = db.prepare(sql.INSERT_POST).run(title, body)
+  return Number(result.lastInsertRowid)
 }
 ```
 
-**Step 3 — use the functions in a route:**
+**Step 4 — use in a route:**
 ```ts
 import { listPosts } from '../db/queries'
 
-const posts = listPosts()  // fully typed result
+const posts = listPosts()
 ```
-
-The `@/` alias maps to `src/`.
 
 ## Auth
 
@@ -165,7 +191,7 @@ The `@/` alias maps to `src/`.
 
 To protect a route or router:
 ```ts
-import { requireAdmin } from '@/middleware/auth'
+import { requireAdmin } from '../../middleware/auth'
 
 // whole router:
 app.use('*', requireAdmin)
@@ -202,7 +228,8 @@ npm run db:new <name>  # scaffold a new migration file
 ## What not to do
 
 - **Do not add React, ReactDOM, or any React-specific packages.** The JSX runtime is hono/jsx.
-- **Do not edit `src/db/queries/`.** These are generated. Edit `src/sql/` and recompile.
+- **Do not use `@/` imports.** Vite doesn't resolve the alias at runtime. Use relative paths.
+- **Do not introduce an ORM or query builder.** Keep SQL in `src/db/sql.ts` as string constants.
 - **Do not edit `db/schema.sql`.** dbmate maintains it.
 - **Do not write client-side JS bundles.** Use htmx attributes for dynamic behavior. If a small client-side script is truly necessary, inline it in the renderer or a layout component — do not add a build step for it.
 - **Do not import `import.meta.env` variables for runtime secrets.** Vite only exposes `VITE_`-prefixed vars there. Use `process.env` instead (dotenv handles loading).

@@ -156,18 +156,19 @@ example.com {
 }
 ```
 
-**3. Keep the process alive.** Node exits on unhandled errors. Use a process manager:
+**3. Keep the process alive.** Use Docker (recommended — see `deploy/README.md` for a complete guide including nginx + TLS) or a process manager:
 
 ```bash
-# PM2
+# Docker (runs migrations automatically on startup)
+docker compose up -d --build
+
+# PM2 (if not using Docker)
 npm install -g pm2
 pm2 start dist/index.js --name myapp
 pm2 save && pm2 startup   # auto-restart on reboot
 ```
 
-Or write a systemd unit pointing to `node /path/to/dist/index.js`.
-
-### Build and run
+### Build and run (without Docker)
 
 ```bash
 npm run db:migrate  # run pending migrations against production DB
@@ -195,9 +196,15 @@ src/
   db/
     client.ts        # better-sqlite3 singleton
     sql.ts           # raw SQL string constants
-    queries.ts       # typed wrapper functions (edit here to add queries)
+    queries.ts       # typed wrapper functions
   components/        # shared TSX components
+deploy/
+  README.md          # deployment guide (Docker + nginx + TLS)
+  nginx-site.conf    # nginx reverse proxy template
 public/              # static assets
+Dockerfile
+docker-compose.yml
+docker-entrypoint.sh
 vite.config.ts
 tsconfig.json
 .env

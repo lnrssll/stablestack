@@ -1,0 +1,8 @@
+node_modules
+dist
+db/app.db
+db/*.db
+.env
+.env.production
+.git
+public/style.css

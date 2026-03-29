@@ -31,6 +31,8 @@ public/style.css
 # database
 db/app.db
 db/*.db
+db/*.db-shm
+db/*.db-wal
 
 # misc
 .DS_Store
